@@ -68,9 +68,9 @@ def get_language_extension(ext):
     """Returns the language for syntax highlighting based on the file extension."""
     return LANGUAGE_MAP.get(ext, 'text')
 
-def format_anchor_name(filename):
-    """Formats a file name into a Markdown-friendly anchor name."""
-    return re.sub(r'[^\w\s]', '', filename).replace(' ', '_').lower()
+def format_anchor_name(filepath):
+    """Formats a file path into a Markdown-friendly anchor name."""
+    return re.sub(r'[^\w\s]', '', filepath).replace(' ', '_').lower()
 
 def write_project_info(file, file_count, dir_count, file_types, total_lines_of_code):
     """Writes the project information to the file in Markdown format."""
@@ -90,24 +90,29 @@ def write_project_info(file, file_count, dir_count, file_types, total_lines_of_c
 
 def write_directory_structure(file, startpath):
     """Writes the directory structure to the file in Markdown format with links to file contents."""
-    def write_structure_and_links(root, level, is_last):
-        """Helper function to write directory structure recursively."""
+    def write_structure_and_links(root, level, is_last, prefix=''):
+        """Helper function to write directory structure recursively with alignment."""
         indent = ' ' * 4 * (level - 1)
-        if level > 0:
-            file.write(f"{indent}{'└── ' if is_last else '├── '}{os.path.basename(root)}/\n")
+        connector = '└── ' if is_last else '├── '
+        vertical_bar = '│   ' if not is_last else '    '
         
-        subindent = ' ' * 4 * level
+        if level > 0:
+            file.write(f"{indent}{connector}{os.path.basename(root)}/\n")
+        
+        subindent = indent + vertical_bar
         files = sorted(os.listdir(root))
         last_index = len(files) - 1
         
         for i, f in enumerate(files):
             file_path = os.path.join(root, f)
             if os.path.isdir(file_path):
-                write_structure_and_links(file_path, level + 1, i == last_index)
+                # Write directory
+                write_structure_and_links(file_path, level + 1, i == last_index, subindent)
             else:
+                # Write file
                 ext = os.path.splitext(f)[1].lower()
                 if ext not in EXCLUDED_EXTENSIONS:
-                    anchor_name = format_anchor_name(f)
+                    anchor_name = format_anchor_name(os.path.relpath(file_path, startpath))
                     file.write(f"{subindent}{'└── '}[{f}](#{anchor_name})\n")
                 else:
                     file.write(f"{subindent}{'└── '}{f} (Excluded)\n")
@@ -127,7 +132,7 @@ def write_file_contents(file, startpath, file_paths):
             relative_path = os.path.relpath(file_path, startpath)
             anchor_name = format_anchor_name(relative_path)
             
-            file.write(f"\n### [{relative_path}](#{anchor_name})\n")
+            file.write(f"\n### {relative_path}\n")
             file.write(f"```{lang}\n")
             if ext in EXCLUDED_EXTENSIONS:
                 file.write("Excluded file type (binary/image)\n")
